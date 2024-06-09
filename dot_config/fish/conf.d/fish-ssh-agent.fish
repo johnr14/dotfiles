@@ -1,4 +1,5 @@
 if test -z "$SSH_ENV"
+    touch $HOME/.ssh/environment
     set -xg SSH_ENV $HOME/.ssh/environment
 end
 
