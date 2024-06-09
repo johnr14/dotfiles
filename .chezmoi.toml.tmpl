@@ -27,9 +27,9 @@
 
 [data]
 {{- if and ($interactive) (not $ephemeral) }}
-    email = {{ promptStringOnce . "email" "Email address" "you@gmail.com" | quote }}
-    name = {{ promptStringOnce . "name" "Full name" "Some One" | quote }}
-    github_username = {{ promptStringOnce . "github_username" "GitHub username" "gitter" | quote }}
+#    email = {{ promptStringOnce . "email" "Email address" "you@gmail.com" | quote }}
+#    name = {{ promptStringOnce . "name" "Full name" "Some One" | quote }}
+#    github_username = {{ promptStringOnce . "github_username" "GitHub username" "gitter" | quote }}
 {{- else -}}
     email = "notconfigurated@notgmail.com"
     name = "No one"
