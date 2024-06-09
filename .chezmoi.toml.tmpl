@@ -1,0 +1,60 @@
+{{- /* Checks if running interactively */ -}}
+{{- $interactive := stdinIsATTY -}}
+
+{{- /* Template file for chezmoi config file */ -}}
+{{- $headless := false -}}{{/* true if this machine does not have a screen and keyboard */}}
+{{- $ephemeral := false -}}{{/* true if this machine is ephemeral, e.g. a cloud or VM instance */}}
+{{- $agekey := false -}}{{/* true if this machine has agekey to decrypt secret */}}
+{{- $personal := false -}}{{/* true if this machine should have personal secrets */}}
+
+{{/* detect GitHub codespaces, VSCode remote containers, Docker containers, Multipass VMs, and Vagrant boxes */}}
+{{- if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu" "vagrant" "vscode") -}}
+{{-   $ephemeral = true -}}
+{{-   $headless = true -}}
+{{- end -}}
+
+{{- $hostname := .chezmoi.hostname -}}
+{{- $osID := .chezmoi.os -}}
+{{- if (and (eq .chezmoi.os "linux") (hasKey .chezmoi.osRelease "id")) -}}
+{{-   $osID = printf "%s-%s" .chezmoi.os .chezmoi.osRelease.id -}}
+{{- end -}}
+
+
+{{- if $interactive -}}
+{{-   writeToStdout "💡 Tip: you can re-enter your data with `chezmoi init --data=false`.\n" -}}
+{{- end -}}
+
+{{- $delta_is_not_installed := true }}
+{{- if (contains "delta" (output "bash" "-c" "command -v delta || true")) }}
+{{-   $delta_is_not_installed = false }}
+{{- end }}
+
+[data]
+{{- if and ($interactive) (not $codespaces) }}
+    email = {{ promptStringOnce . "email" "Email address" "you@gmail.com" | quote }}
+    name = {{ promptStringOnce . "name" "Full name" "Some One" | quote }}
+    github_username = {{ promptStringOnce . "github_username" "GitHub username" "gitter" | quote }}
+{{-   else -}}
+    email = "notconfigurated@notgmail.com"
+    name = "No one"
+    github_username = "notgit"
+    github_email = {{ $email }}
+{{- end -}}
+    headless = {{ $headless }}
+    ephemeral = {{ $ephemeral }}
+    hostname = {{ $hostname | quote }}
+    personal = {{ $personal }}
+    osid = {{ $osID | quote }}
+
+
+  [flags]
+    delta_is_not_installed = {{ $delta_is_not_installed }}
+
+[github]
+    refreshPeriod = "12h"
+
+[merge]
+    #command = "nvim"
+    #args = ["-d", "{{ "{{" }} .Destination {{ "}}" }}", "{{ "{{" }} .Source {{ "}}" }}", "{{ "{{" }} .Target {{ "}}" }}"]
+    command = "code"
+    args = ["--wait", "--merge", "{{ "{{" }} .Destination {{ "}}" }}", "{{ "{{" }} .Source {{ "}}" }}", "{{ "{{" }} .Target {{ "}}" }}", "{{ "{{" }} .Source {{ "}}" }}"]
