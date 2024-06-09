@@ -42,11 +42,3 @@
     personal = {{ $personal }}
     osid = {{ $osID | quote }}
 
-[github]
-    refreshPeriod = "12h"
-
-[merge]
-    #command = "nvim"
-    #args = ["-d", "{{ "{{" }} .Destination {{ "}}" }}", "{{ "{{" }} .Source {{ "}}" }}", "{{ "{{" }} .Target {{ "}}" }}"]
-    command = "code"
-    args = ["--wait", "--merge", "{{ "{{" }} .Destination {{ "}}" }}", "{{ "{{" }} .Source {{ "}}" }}", "{{ "{{" }} .Target {{ "}}" }}", "{{ "{{" }} .Source {{ "}}" }}"]
