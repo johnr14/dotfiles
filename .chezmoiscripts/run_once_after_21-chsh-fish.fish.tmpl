@@ -1,12 +1,12 @@
 #!/usr/bin/env fish
 
 # Set fish as default shell
-if groups $user | grep -qw 'wheel' 
+if groups $user | grep -qw 'wheel'; and status --is-interactive
   echo "Changing default shell to fish"
   #chsh -s $(which fish)
   if not set -q DISTROBOX_HOST_HOME
     sudo usermod -s /usr/bin/fish {{ .chezmoi.username }}
   end
 else
-  echo "Not changing default shell as not in wheel"
+  echo "Not changing default shell as not in wheel or not interactive"
 end
