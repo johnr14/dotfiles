@@ -1,0 +1,31 @@
+set hidden
+set icons
+set preview on
+set number
+set relativenumber
+set drawbox true
+#set ifs "\n"
+set shell fish
+# leave some space at the top and the bottom of the screen
+set scrolloff 10
+set promptfmt "\033[34;1m%d\033[0m\033[1m%f\033[0m"
+
+# Use the `dim` attribute instead of underline for the cursor in the preview pane
+set cursorpreviewfmt "\033[7;2m"
+
+map <a-f> filter
+map <a-d> set dironly!
+
+map . set hidden!
+
+# use enter for shell commands
+map S shell
+
+# show the result of execution of previous commands
+map ` !true
+
+#map <enter> open
+#map <esc> 
+
+# MORE :
+# https://git.alex.balgavy.eu/dotfiles/file/lf/lfrc.html

@@ -1,0 +1,305 @@
+#!/usr/bin/env bash
+# IMPORTANT : WIP script is not completed !!!
+# TODO: PORT FORWARDING
+# TODO: Add more options for connections see: https://phoenixnap.com/kb/ssh-config
+# Support split ~/.ssh/config.d/IDENT See:https://superuser.com/questions/247564/is-there-a-way-for-one-ssh-config-file-to-include-another-one
+
+# TODO: FIX # Ensure KnownHosts are unreadable if leaked - it is otherwise easier to know which hosts your keys have access to.
+# HashKnownHosts yes https://infosec.mozilla.org/guidelines/openssh.html
+# HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,ssh-ed25519
+# KexAlgorithms curve25519-sha256@libssh.org
+# MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+# Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+
+# More safety, by turning some bugs into errors.
+# Without `errexit` you don’t need ! and can replace
+# ${PIPESTATUS[0]} with a simple $?, but I prefer safety.
+set -o errexit -o pipefail -o noclobber -o nounset
+
+# -allow a command to fail with !’s side effect on errexit
+# -use return value from ${PIPESTATUS[0]}, because ! hosed $?
+! getopt --test >/dev/null
+if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
+	echo 'I’m sorry, `getopt --test` failed in this environment.'
+	exit 1
+fi
+
+ARGVNB=$#
+
+# option --output/-o requires 1 argument
+LONGOPTS=help,check,Hostgen:,remote:,purge,purge-all,generate-only,clipboard,pass,identifier:,no-config,description:,upgrade-key,update,config-out
+OPTIONS=hCH:r:pAgcPi:nd:u:Uo:
+
+# -regarding ! and PIPESTATUS see above
+# -temporarily store output to be able to check for errors
+# -activate quoting/enhanced mode (e.g. by writing out “--options”)
+# -pass arguments only via   -- "$@"   to separate them correctly
+! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
+if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+	# e.g. return value is 1
+	#  then getopt has complained about wrong arguments to stdout
+	exit 2
+fi
+# read getopt’s output this way to handle the quoting right:
+eval set -- "$PARSED"
+
+GETHELP=n CHECK=n HOSTGEN=n REMOTEHOST="" PURGE=n PURGEALL=n GENONLY=n CLIP=n SETPASS=n IDENTIFIER="" NOCONFIG=n DESC="" UPGRADEKEY="" UPDATE=n TEST=n OUTCONF="$HOME/.ssh/config"
+
+# https://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
+# now enjoy the options in order and nicely split until we see --
+while true; do
+	case "$1" in
+	-h | --help)
+		GETHELP=y
+		shift
+		;;
+	-C | --check)
+		CHECK=y
+		shift
+		;;
+	-H | --hostgen)
+		HOSTGEN=$2
+		shift 2
+		;;
+	-r | --remote)
+		REMOTEHOST="$2"
+		shift 2
+		;;
+	-i | --identifier)
+		IDENTIFIER="$2"
+		shift 2
+		;;
+	-d | --description)
+		DESC="$2"
+		shift 2
+		;;
+	-P | --pass)
+		SETPASS=y
+		shift
+		;;
+	-p | --purge)
+		PURGE=y
+		shift
+		;;
+	-U | --update)
+		PURGE=y
+		shift
+		;;
+	-A | --purge-all)
+		PURGEALL=y
+		shift
+		;;
+	-g | --generate-only)
+		GENONLY=y
+		shift
+		;;
+	-n | --no-config)
+		NOCONFIG=y
+		shift
+		;;
+	-c | --clipboard)
+		CLIP=y
+		shift
+		;;
+	-u | --upgrade-key)
+		UPGRADEKEY=$2
+		shift 2
+		;;
+	-o | --config-out)
+		OUTCONF=$2
+		shift 2
+		;;
+	--)
+		shift
+		break
+		;;
+	*)
+		echo "Programming error"
+		exit 3
+		;;
+	esac
+done
+
+# handle no arguments
+if [[ $ARGVNB -lt 1 ]]; then
+	echo "This script will generate unique ssh keys and help you upload them to servers."
+	echo "It will generate ed25519 keys with a meaningful comment."
+	echo "To use this script do :"
+	echo ""
+	echo "./ssh-helper.sh -H myLaptop -r user@sshserver.remote:22"
+	echo ""
+	echo "Or type: ./ssh-helper.sh --help"
+	exit 4
+fi
+
+echo "-h:$GETHELP -c:$CHECK -H:$HOSTGEN -r:$REMOTEHOST -p:$PURGE -A:$PURGEALL -g:$GENONLY -c:$CLIP -P:$SETPASS -i:$IDENTIFIER" -n:$NOCONFIG -d:$DESC -u:$UPGRADEKEY -U:$UPDATE -o:$OUTCONF
+
+# Check hostname != fedora, arch
+
+__ssh_helper_help() {
+	echo "This script is to help generating unique ssh keys for remote access."
+	echo "Keys will be passwordless by default to allow easy remote configuration."
+	echo ""
+	echo "Generated keys will be named and saved in ~/.ssh :"
+	echo "id_\$USER@\$HOSTGEN-\$REMOTEUSER@\$REMOTEHOST-\$YEAR-\$MONTH_ed25519 and .pub"
+	echo "With comment : \$USER@\$HOSTGEN \$REMOTREUSER@\$REMOTEHOST:\$PORT \$REMOTEHOSTIDENTIFIER \$YEAR-\$MONTH \$PASSWORDLESS=y|n \${DESC}"
+	echo ""
+	echo "Generating a key example : ssh-helper -H myTwerDT -r remoteuser@server.remote:2022 -i testbox.servers -d \"Test ssh key\""
+	echo "-r|--remote : remote server, require USER@SERVER, port can be passed as USER@SERVER:2022."
+	echo "-H|--hostgen : identifier of this computer, defaults to \$HOSTNAME"
+	echo "-d|--description \"in quotes\" : additionnal description for pub key comment, like project name."
+	echo "-P|--pass : force asking for a password for the key."
+	echo "-g|--generate-only : do not upload .pub key to remote server"
+	echo "-i|--identifier IDENT : provide custome identifier for server, will be saved to ~/.ssh/config and allow to connect with \"ssh IDENT\""
+	echo "                        It's a good idea to use good naming like : priviledge.service.vm.host"
+	echo "                        For example : script.backup.vm1.provider and admin.www.vm4.provider"
+	echo "-j|--proxy-jump IDENT: connect to remote server through a proxy. The proxy must be already configured. For explainations : https://goteleport.com/blog/ssh-config/"
+	#echo "-c|--clipboard : enable pasting to local clipboard from remote ssh server. NOT IMPLEMENTED YET!"
+	#echo "-U|--update : Update IP of IDENT host to new REMOTEHOST and check that key is present. Can be used to create entry in ~/.ssh/config if it was not done previously. NOT IMPLEMENTED YET!"
+	echo "-n|--no-config : do not generate entry in ~/.ssh/config"
+	echo "-o|--config-out <file> : Change destination of Host description from ~/.ssh/config file to some other file."
+	echo ""
+	echo "Additionnal helper functions :"
+	#echo "-E|--expired : Regenerate all keys that are older than a year, testing remote if accessible and updating the key. Renaming old keys as KEY.old NOT IMPLEMENTED YET!"
+	#echo "-p|--purge : Remove all .old keys that have been replaced locally and on remote servers. Use with --check to be sure remote servers will still be accessible with a new key. NOT IMPLEMENTED YET!"
+	#echo "-u|--upgrade-key \"all|IDENT|SERVER\" : Force generating and uploading new keys for a specific server or all servers. NOT IMPLEMENTED YET!"
+	echo "-C|--check : check if config file is valid and all keys are present. NOT IMPLEMENTED YET!"
+	#echo "-t|--test : test if remote host is accessible and is in known_hosts. NOT IMPLEMENTED YET!"
+	echo "-h|--help : print this help"
+	echo ""
+	echo "See https://linuxize.com/post/using-the-ssh-config-file/ for information on the .ssh/config file usage."
+}
+
+if [ "$UPGRADEKEY" != "" ] || [ "$CLIP" == "y" ] || [ "$CHECK" == "y" ] || [ "$UPGRADEKEY" == "y" ] || [ "$UPDATE" == "y" ] || [ "$TEST" != "n" ]; then
+	echo "Not yet implemented !"
+	exit 1
+fi
+
+mkdir -p ${HOME}/.ssh && chmod 700 ${HOME}/.ssh
+touch ${HOME}/.ssh/config
+chmod 600 ${HOME}/.ssh/config
+
+if [ "$HOSTGEN" == "n" ] && [ "$GETHELP" == "n" ]; then
+	if [ "$(hostname)" == "fedora" ] || [ "$(hostname)" == "arch" ]; then
+		echo "Hostname is generic, pass a meaningful name with -H"
+		exit 1
+	fi
+fi
+
+if [ "$CHECK" == "y" ]; then
+	#  check if config file is valid and all keys are present
+	if ! [[ -f "$OUTCONF" ]]; then
+		echo "Config file does not exits!"
+		exit 1
+	fi
+
+fi
+
+ITERATIONS=200
+if [ "$REMOTEHOST" == "" ]; then
+	echo "-r|--remote user@sshserver.remote missing ! Read --help :"
+	echo ""
+	__ssh_helper_help
+else
+
+	if [ "$DESC" == "" ]; then DESC="Generated by ssh-helper"; fi
+
+	REMOTEHOSTNAME=$(echo $REMOTEHOST | awk -F '@' '{print $NF}' | awk -F ':' '{print $1}')
+	REMOTEUSER=$(echo $REMOTEHOST | awk -F '@' '{print $1}')
+	if ! [[ $REMOTEHOST == *":"* ]]; then
+		REMOTEPORT="22"
+	else
+		REMOTEPORT="$(echo $REMOTEHOST | awk -F '@' '{print $NF}' | awk -F ':' '{print $NF}' | sed 's/[^0-9]//g')"
+	fi
+	#if [ "$REMOTEPORT" == "" ]; then REMOTEPORT="22"; fi
+	PASSWORDLESS="PASSWORDLESS=y"
+	#if [ "$SETPASS" == "y" ]; then
+	#	SETPASS=""
+	#	PASSWORDLESS="PASSWORDLESS=n"
+	#else SETPASS="-N ''"; fi
+	echo "Remote is $REMOTEUSER@$REMOTEHOSTNAME:$REMOTEPORT generated from $USER@$HOSTGEN"
+	echo "Generated key will be : ssh-keygen -o -a ${ITERATIONS} -t ed25519 -f ${HOME}/.ssh/id_${USER}@${HOSTGEN}-${REMOTEUSER}@${REMOTEHOSTNAME}_ed25519 -C \"${USER}@${HOSTGEN} ${REMOTEUSER}@${REMOTEHOSTNAME}:${REMOTEPORT} $(date '+%Y-%m') $PASSWORDLESS ${DESC}\" ${SETPASS} "
+
+	PRVKEY="${HOME}/.ssh/id_${USER}@${HOSTGEN}-${REMOTEUSER}@${REMOTEHOSTNAME}-$(date '+%Y-%m')_ed25519"
+
+	echo "PRVKEY=$PRVKEY"
+	if ! [ -f "$PRVKEY" ]; then
+		if [ "$SETPASS" == "n" ]; then
+			ssh-keygen -o -a ${ITERATIONS} -t ed25519 -f ${PRVKEY} -C "${USER}@${HOSTGEN} ${REMOTEUSER}@${REMOTEHOSTNAME}:${REMOTEPORT} $(date '+%Y-%m') ${PASSWORDLESS} ${DESC}" -P ''
+			echo "ssh-keygen -o -a ${ITERATIONS} -t ed25519 -f ${PRVKEY} -C \"${USER}@${HOSTGEN} ${REMOTEUSER}@${REMOTEHOSTNAME}:${REMOTEPORT} $(date '+%Y-%m') ${PASSWORDLESS} '${DESC}'\" ${SETPASS}"
+		else
+			#MUST DO IT LIKE THIS, DIDN'T WORK PUTTING "-P ''" in a variable
+			ssh-keygen -o -a ${ITERATIONS} -t ed25519 -f ${PRVKEY} -C "${USER}@${HOSTGEN} ${REMOTEUSER}@${REMOTEHOSTNAME}:${REMOTEPORT} $(date '+%Y-%m') ${PASSWORDLESS} ${DESC}"
+			echo "ssh-keygen -o -a ${ITERATIONS} -t ed25519 -f ${PRVKEY} -C \"${USER}@${HOSTGEN} ${REMOTEUSER}@${REMOTEHOSTNAME}:${REMOTEPORT} $(date '+%Y-%m') ${PASSWORDLESS} '${DESC}'\" ${SETPASS}"
+		fi
+	fi
+
+	if ! [ -f "$PRVKEY" ]; then
+		echo "Error: could not generate the file : $PRVKEY"
+		exit 1
+	fi
+	cat $PRVKEY
+	cat $PRVKEY.pub
+	echo ""
+
+	echo "Debug OK"
+	if [ "$NOCONFIG" == "n" ]; then
+		# Generating an entry in $HOME/.ssh/config
+
+		#Sanity check FIXME
+		#    dirname "$OUTCONF" | tr '/' $'\n' | while read CONFPATH ; do
+		#        # Check for execute permissions
+		#        if ! [[ -x "$CONFPATH" ]] ; then
+		#            echo "'$CONFPATH' is blocking access."
+		#            exit 1
+		#        fi
+		#        touch "$OUTCONF" || { echo "Cannot write to $OUTCONF" >&2; exit 1 }
+		#    done
+
+		if [ "$IDENTIFIER" == "" ]; then IDENTIFIER="$REMOTEHOST"; fi
+		HOSTLINE="Host $IDENTIFIER"
+		if grep -a "$HOSTLINE" "$OUTCONF" &>/dev/null; then
+			echo "Host already exist in $OUTCONF"
+			echo "This is what should have been added : "
+			echo "Host $IDENTIFIER
+    HostName $REMOTEHOSTNAME
+    User $REMOTEUSER
+    Port $REMOTEPORT
+    # tells the ssh client exactly which key to present and forgo any keys in ~/.ssh or the ssh-agent
+    IdentitiesOnly yes
+    IdentityFile ${PRVKEY}
+" | tee ${PRVKEY}.config
+		else
+			echo "Adding the following to $OUTCONF"
+			echo "Host $IDENTIFIER
+    HostName $REMOTEHOSTNAME
+    User $REMOTEUSER
+    Port $REMOTEPORT
+    # tells the ssh client exactly which key to present and forgo any keys in ~/.ssh or the ssh-agent
+    IdentitiesOnly yes
+    IdentityFile ${PRVKEY}
+    Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+    Compression yes
+" | tee -a $OUTCONF ${PRVKEY}.config
+		fi
+	fi
+fi
+
+# Check if key associated with host
+SSHCONFIGFILE="~/.ssh/config"
+# Create ssh key
+# KEYNAME = id_$HOSTGEN-$REMOTEUSER@$REMOTEHOSTNAME_ed25519
+#ssh-keygen -o -a 200 -t ed25519 -f ~/.ssh/id_$HOSTGEN-$REMOTEUSER@$REMOTEHOSTNAME_ed25519 -C "$USER@$HOSTGEN $REMOTREUSER@REMOTEHOSTNAME $DATE" -N ''
+# Send ssh key
+echo "Sending ssh key with :"
+echo "ssh-copy-id -i ${PRVKEY} $REMOTEHOST"
+ssh-copy-id -i ${PRVKEY} $REMOTEHOST
+#ssh-copy-id -i ~/.ssh/tatu-key-ecdsa user@host
+# ssh-copy-id -i ~/.ssh/id_rsa.pub peter@192.0.2.44/home/peter/.ssh/authorized_keys
+# Validate ssh key
+
+# Revoque keys
+# Purge all
+# Purge other
+
+# Enable clipboard copy from remote host

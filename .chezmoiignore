@@ -1,0 +1,34 @@
+README.md
+*.md
+*/*.md
+*/*/*.md
+LICENSE
+
+
+backups/   # ignore the backups folder, but not its contents
+backups/** # ignore the contents of backups folder but not the folder itself
+*.gz
+*.tar
+*.zip
+
+
+{{- if ne .email "firstname.lastname@company.com" }}
+# Ignore .company-directory unless configured with a company email
+.company-directory # note that the pattern is not dot_company-directory
+{{- end }}
+
+{{- if ne .email "me@home.org" }}
+.personal-file
+{{- end }}
+
+{{- if ne .chezmoi.osRelease.id "arch" -}}
+.config/environment.d/arch.conf
+{{- end -}}
+
+.config/fish/fish_history
+.config/nvim/lazy-lock.json
+.config/fish/completions/fisher.fish
+.config/fish/completions/fzf_configure_bindings.fish
+.config/fish/conf.d/lf-icons.fish
+.config/fish/functions/fisher.fish
+.config/fish/fish_variables

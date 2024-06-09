@@ -1,0 +1,2 @@
+#!/usr/bin/env fish
+fzf --preview 'kitty +kitten icat --place=$FZF_PREVIEW_COLUMNSx$FZF_PREVIEW_LINES@0x0 {}'

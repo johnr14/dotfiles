@@ -1,0 +1,12 @@
+{{ if (and (eq .chezmoi.os "linux") (ne .headless "true") (ne .chezmoi.username "root")) -}}
+#!/bin/bash
+
+set -eufo pipefail
+
+if [ -x ~/.local/bin/getnf && ! -f /run/ostree-run ]; then
+    ~/.local/bin/getnf -i 3270,CascadiaCode,CascadiaMono,DejaVuSansMono,FiraMono,Hack,IBMPlexMono,IosevkaTerm,JetBrainsMono,SourceCodePro,UbuntuMono,Terminus
+else
+    echo "ERROR: Could not install nerd fonts !"
+fi
+
+{{ end }}
