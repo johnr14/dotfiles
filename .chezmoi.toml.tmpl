@@ -39,7 +39,7 @@
     email = "notconfigurated@notgmail.com"
     name = "No one"
     github_username = "notgit"
-    github_email = {{ $email }}
+    github_email = {{ $email | quote}}
 {{- end -}}
     headless = {{ $headless }}
     ephemeral = {{ $ephemeral }}
