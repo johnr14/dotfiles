@@ -18,7 +18,7 @@
 {{- if (and (eq .chezmoi.os "linux") (hasKey .chezmoi.osRelease "id")) -}}
 {{-   $osID = printf "%s-%s" .chezmoi.os .chezmoi.osRelease.id -}}
 {{- end -}}
-{{- $email := "" -}}
+{{- $email := "noemail" -}}
 
 
 {{- if $interactive -}}
