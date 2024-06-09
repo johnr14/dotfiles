@@ -19,6 +19,8 @@ set -q LESS_TERMCAP_se; or set -gx LESS_TERMCAP_se (set_color normal)
 set -q LESS_TERMCAP_us; or set -gx LESS_TERMCAP_us (set_color -u magenta)
 set -q LESS_TERMCAP_ue; or set -gx LESS_TERMCAP_ue (set_color normal)
 
+# Make sure ~/.ssh folder exist
+mkdir -p ~/.ssh
 
 # XDG apps
 # set -gx GNUPGHOME $XDG_DATA_HOME/gnupg
