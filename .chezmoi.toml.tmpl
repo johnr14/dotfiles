@@ -25,17 +25,12 @@
 {{-   writeToStdout "💡 Tip: you can re-enter your data with `chezmoi init --data=false`.\n" -}}
 {{- end -}}
 
-{{- $delta_is_not_installed := true }}
-{{- if (contains "delta" (output "bash" "-c" "command -v delta || true")) }}
-{{-   $delta_is_not_installed = false }}
-{{- end }}
-
 [data]
 {{- if and ($interactive) (not $ephemeral) }}
     email = {{ promptStringOnce . "email" "Email address" "you@gmail.com" | quote }}
     name = {{ promptStringOnce . "name" "Full name" "Some One" | quote }}
     github_username = {{ promptStringOnce . "github_username" "GitHub username" "gitter" | quote }}
-{{-   else -}}
+{{- else -}}
     email = "notconfigurated@notgmail.com"
     name = "No one"
     github_username = "notgit"
@@ -46,10 +41,6 @@
     hostname = {{ $hostname | quote }}
     personal = {{ $personal }}
     osid = {{ $osID | quote }}
-
-
-  [flags]
-    delta_is_not_installed = {{ $delta_is_not_installed }}
 
 [github]
     refreshPeriod = "12h"
