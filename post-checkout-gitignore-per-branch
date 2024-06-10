@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+
+# This comes from https://www.reddit.com/r/git/comments/nc30iq/branch_specific_gitignore/
+# From jthill :
+# To construct branch-specific content, install a post-checkout hook and don't track the constructed file, track its construction rules, the simplest way to handle the general case might be ...
+# and then any file that ends .@branch will be run through that sed
+#
+# Copy this to your .git/hooks with
+# cp post-checkout-gitignore-per-branch .git/hooks/
+
+if branch=$(git symbolic-ref HEAD --short -q); then
+	for file in $(git ls-files -cix*.@branch); do
+		echo "* making ${file%.@branch} from $file with branch-specific includes"
+		echo '/^@include-branch-specific ([a-z/]*)$/ { s//cat \1.'$branch'/e }' |
+			sed -rf- $file >${file%.@branch}
+	done
+fi
