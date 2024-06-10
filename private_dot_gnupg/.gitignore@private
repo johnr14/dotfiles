@@ -1,5 +1,6 @@
+#on main branch ignore
 *
-!gpg.conf
+.gitignore
 !.gitignore@main
 !.gitignore@private
 
