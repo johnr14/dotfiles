@@ -80,5 +80,9 @@ chezmoi apply
    ```
    touch ~./ssh/test.file ~/.gnupg/test.file
    chezmoi add ~.ssh/ ~/.gnupg/
-   cd $(chezmoi source-path); git switch private; status && git commit -am "test private branch not leaking in public" && git push
+   cd $(chezmoi source-path); git switch main; status && git commit -am "test private branch not leaking in public" && git push origin main 
+   cd $(chezmoi source-path); git switch private; status && git commit -am "test private branch not leaking in public" && git push dot-private private 
    ```
+
+11. Check diff between main and private branch
+   - `git diff main..private`
