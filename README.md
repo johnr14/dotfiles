@@ -25,3 +25,14 @@ The only other thing to keep in mind is inevitably the branches have different h
 
 Suffice to say, I’ve spent way too much time over the years curating my dotfiles.
 </blockquote>
+
+Create an empty branch with
+`git branch --orphan private`
+
+Commit a README.md and push it.
+
+Then [lock branch](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#lock-branch)
+
+After return to `main` branch, add new remote for private branch and remove old.
+
+
