@@ -49,34 +49,34 @@ chezmoi apply
 2. Create README.md
 
 3. Add, commit and push private branch to github
-   Note this commit should be only the README.md !
+  - Note this commit should be only the README.md !
 
 4. Make the branch locked by going in `Settings` on github page
-   - In `Branches` click `Add classic branch protection rule`
-   - Check `Lock branch` and `Do not allow bypassing the above settings`
+  - In `Branches` click `Add classic branch protection rule`
+  - Check `Lock branch` and `Do not allow bypassing the above settings`
 
 5. Delete local private branch
-   - `git branch -d private`
+  - `git branch -d private`
 
 6. Create new private branch
-   - `git branch -b private`
+  - `git branch -b private`
 
 7. Push private branch to private repository and set relation
-   - `git push --set-upstream dot-private private`
+  - `git push --set-upstream dot-private private`
 
 8. Remove remote private branch on origin
-   - `git branch --delete --remotes origin/private`
+  - `git branch --delete --remotes origin/private`
 
 9. Install hooks to overwrite `.gitignore` with `.gitignore@branch` when using `git switch|checkout`
-   - `cp post-checkout .git/hooks`
-   - `cp post-checkout .git/hooks/post-switch`
-   - TODO: Automate hooks install with chezmoi
+  - `cp post-checkout .git/hooks`
+  - `cp post-checkout .git/hooks/post-switch`
+  - TODO: Automate hooks install with chezmoi
 
 > [!CAUTION]
 > You must copy hooks to .git folder every time you install your dotfiles !
 
 10. Test that when in `main` branch, your .gitignore will not track files that should not be public
-   - Test for by : 
+  - Test for by : 
    ```
    touch ~./ssh/test.file ~/.gnupg/test.file
    chezmoi add ~.ssh/ ~/.gnupg/
@@ -85,4 +85,9 @@ chezmoi apply
    ```
 
 11. Check diff between main and private branch
-   - `git diff main..private`
+  - `git diff main..private`
+
+12. Add private stuff only in private branch
+  - Switch to private branch before adding/re-adding files with `chezmoi add|re-add`
+   - `cd $(chezmoi source-path); git switch private` 
+
