@@ -11,8 +11,7 @@
 if branch=$(git symbolic-ref HEAD --short -q); then
 	echo "In branch $branch"
 	for file in $(git ls-files -cix "*@$branch"); do
-		echo "found file $file"
-    echo "cat $file > ${file/@$branch/}"
-    pwd
+		echo "found file $file and ovewriting ${file/@$branch/} with it"
+    cat $file > ${file/@$branch/}
 	done
 fi
