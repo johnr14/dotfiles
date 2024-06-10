@@ -1,3 +1,0 @@
-private_dot_ssh/**
-private_dot_gnupg/**
-!private_dot_gnupg/gnupg.conf
