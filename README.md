@@ -64,10 +64,21 @@ chezmoi apply
 7. Push private branch to private repository and set relation
    - `git push --set-upstream dot-private private`
 
-8. Test that when in `main` branch, your .gitignore will not track files that should not be public
+8. Remove remote private branch on origin
+   - `git branch --delete --remotes origin/private`
+
+9. Install hooks to overwrite `.gitignore` with `.gitignore@branch` when using `git switch|checkout`
+   - `cp post-checkout .git/hooks`
+   - `cp post-checkout .git/hooks/post-switch`
+   - TODO: Automate hooks install with chezmoi
+
+> [!CAUTION]
+> You must copy hooks to .git folder every time you install your dotfiles !
+
+10. Test that when in `main` branch, your .gitignore will not track files that should not be public
    - Test for by : 
    ```
    touch ~./ssh/test.file ~/.gnupg/test.file
    chezmoi add ~.ssh/ ~/.gnupg/
-   git status && git commit -am "test private branch not leaking in public" && git push
+   cd $(chezmoi source-path); git switch private; status && git commit -am "test private branch not leaking in public" && git push
    ```
