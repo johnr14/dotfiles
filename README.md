@@ -42,3 +42,32 @@ chezmoi apply
 2. Nested session
 3. TMUX
 
+# Managing secrets without exposing your encrypted files on the public repository.
+
+1. Create empty branch
+
+2. Create README.md
+
+3. Add, commit and push private branch to github
+   Note this commit should be only the README.md !
+
+4. Make the branch locked by going in `Settings` on github page
+   - In `Branches` click `Add classic branch protection rule`
+   - Check `Lock branch` and `Do not allow bypassing the above settings`
+
+5. Delete local private branch
+   - `git branch -d private`
+
+6. Create new private branch
+   - `git branch -b private`
+
+7. Push private branch to private repository and set relation
+   - `git push --set-upstream dot-private private`
+
+8. Test that when in `main` branch, your .gitignore will not track files that should not be public
+   - Test for by : 
+   ```
+   touch ~./ssh/test.file ~/.gnupg/test.file
+   chezmoi add ~.ssh/ ~/.gnupg/
+   git status && git commit -am "test private branch not leaking in public" && git push
+   ```
