@@ -9,9 +9,10 @@
 # cp post-checkout-gitignore-per-branch .git/hooks/
 
 if branch=$(git symbolic-ref HEAD --short -q); then
-	for file in $(git ls-files -cix*.@branch); do
-		echo "* making ${file%.@branch} from $file with branch-specific includes"
-		echo '/^@include-branch-specific ([a-z/]*)$/ { s//cat \1.'$branch'/e }' |
-			sed -rf- $file >${file%.@branch}
+	echo "In branch $branch"
+	for file in $(git ls-files -cix "*@$branch"); do
+		echo "found file $file"
+    echo "cat $file > ${file/@$branch/}"
+    pwd
 	done
 fi
