@@ -87,7 +87,20 @@ chezmoi apply
 11. Check diff between main and private branch
   - `git diff main..private`
 
-12. Add private stuff only in private branch
+12. Add private stuff in main branch and check that it's not marked as new file
   - Switch to private branch before adding/re-adding files with `chezmoi add|re-add`
-   - `cd $(chezmoi source-path); git switch private` 
+   - `cd $(chezmoi source-path); git switch main`
 
+> [!CAUTION]
+> Always merge from main->private and not the other way around unless you are a git veteran. CHECK no sensible files are marked before any commit.
+
+13. TODO:
+  - Automate with chezmoi
+    - Ask for github user
+    - Ask if use your own dotfiles-private branch
+    - Change origin to your own
+    - Keep upstream to johnr14/dotfiles to be able to ask merge for improvement or benefit from upstream improvement
+    - Changing of git branches for remote private at dotfiles-private
+    - Remove origin/private
+    - Pull dotfiles-private/private
+  - Generate a ssh key for current user
