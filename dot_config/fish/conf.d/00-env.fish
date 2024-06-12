@@ -30,5 +30,7 @@ mkdir -p ~/.ssh
 set -gx MY_PROJECTS $HOME/github
 
 # Add bin directories to path.
-fish_add_path --prepend $HOME/.local/bin
+if test -d ~/.local/bin
+  fish_add_path --prepend $HOME/.local/bin
+end
 #fish_add_path --prepend $HOME/bin
