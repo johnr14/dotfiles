@@ -8,7 +8,7 @@ function fish_greeting -d "This will show the greeting screen"
 
     set -l UPTIME (echo $(awk '{print $1}' /proc/uptime) / 60 | bc)
     if [ "$UPTIME" -ge 15 ]
-        return 0
+    #return 0
     end
 
     # Check if parent pid is an other fish shell and do nothing if it is
@@ -28,8 +28,10 @@ function fish_greeting -d "This will show the greeting screen"
     # Do checks
 
     # Neofetch
-    if command -s neofetch >/dev/null
-        neofetch --disable packages resolution theme icons --color_blocks off --backend off
+    if command -s fastfetch >/dev/null
+        fastfetch
+    else if command -s /usr/bin/neofetch >/dev/null
+        /usr/bin/neofetch --disable packages resolution theme icons --color_blocks off --backend off
     end
 
     #dfc
@@ -67,20 +69,24 @@ function fish_greeting -d "This will show the greeting screen"
 
     # Users and process
     echo ""
-    set LOGGEDUSERS $(w -f -i -s -h | awk '{print $1}' | sort | uniq -c | tr '\n' ' ' | grep -o '[^$(printf '\t') ].*')
+  
+    #set LOGGEDUSERS $(w -f -i -s -h | awk '{print $1}' | sort | uniq -c | tr '\n' ' ' | grep -o '[^$(printf '\t') ].*')
+    set LOGGEDUSERS $(w -f -i -h | awk '{print $1}' | wc -l)
     if test -z "$LOGGEDUSERS"
         set LOGGEDUSERS 1
     end
     printf "Users logged in : "
     set_color red
     printf "%s\n" $LOGGEDUSERS
-    set_color normal
+    set_color normal   
+
+    w -f -i -h
+    echo ""
     printf "There are "
     set_color red
     printf "%s" $(ps aux | tail -n +2 | wc -l)
     set_color normal
     printf " processes running.\n"
-
 
     printf "\nTop memory hungry process:\n"
     if command -s procs >/dev/null
