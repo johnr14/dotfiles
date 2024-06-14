@@ -20,8 +20,6 @@
 
 {{- $name := .chezmoi.username -}}
 {{- $email := "fixme" -}}
-{{- $github_user := "johnr14" -}}
-{{- $github_email := "@github.com" -}}
 
 {{- $passphrase := default "change me with 'SETPASS=1 chezmoi init'" (index . "passphrase") -}}
 {{- $use_ansible := default "false"}}
@@ -46,15 +44,12 @@
 {{-   $github_user = promptString "GitHub Username" $github_user -}}
 {{-   $github_email = promptString "GitHub Email" $github_email -}}
 
-{{- else if (env "johnr14") }}
+{{- else }}
 
 {{-   $dotfiles_private = promptBool "$dotfiles_private" -}}
 
-{{-   $name      := "johnr14" -}}
-{{-   $email     :=  "5272079+johnr14@users.noreply.github.com" -}}
-
-{{-   $github_user = $name -}}
-{{-   $github_email = $email -}}
+{{-   $name      = "johnr14" -}}
+{{-   $email     =  "5272079+johnr14@users.noreply.github.com" -}}
 
 {{- end }}
 
@@ -63,13 +58,12 @@ umask = 0o022
 
 encryption = "age"
 [age]
-    identity = "private_dot_age/chezmoi_age.key.age"
+    identity = "~/.age/chezmoi_age.key.age"
     recipient = "age1fmur258g3ryqjey6dem6nv9zpqhguexga6lmkvgd4ekzw2q64spq408zre"
 
 [data]
     github_user = {{ $name | quote }}
     github_email = {{ $email | quote }}
-    passphrase = {{ $passphrase | quote }}
     dotfiles_private = {{ $dotfiles_private | quote }}
     use_ansible = {{ $use_ansible | quote }}
     headless = {{ $headless | quote }}
