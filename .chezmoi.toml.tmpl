@@ -46,6 +46,16 @@
 {{-   $github_user = promptString "GitHub Username" $github_user -}}
 {{-   $github_email = promptString "GitHub Email" $github_email -}}
 
+{{- else if (env "johnr14") }}
+
+{{-   $dotfiles_private = promptBool "$dotfiles_private" -}}
+
+{{-   $name      := "johnr14" -}}
+{{-   $email     :=  "5272079+johnr14@users.noreply.github.com" -}}
+
+{{-   $github_user = $name -}}
+{{-   $github_email = $email -}}
+
 {{- end }}
 
 
