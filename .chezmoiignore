@@ -13,12 +13,12 @@ backups/** # ignore the contents of backups folder but not the folder itself
 *.zip
 
 
-{{- if ne .email "firstname.lastname@company.com" }}
+{{- if ne .github_email "firstname.lastname@company.com" }}
 # Ignore .company-directory unless configured with a company email
 .company-directory # note that the pattern is not dot_company-directory
 {{- end }}
 
-{{- if ne .email "me@home.org" }}
+{{- if ne .github_email "me@home.org" }}
 .personal-file
 {{- end }}
 

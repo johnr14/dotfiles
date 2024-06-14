@@ -1,74 +1,81 @@
 # -*-mode:conf-toml-*- vim:ft=toml
 
 {{/* boolean feature tags */}}
-{{- $personal_device := false -}}{{/* TODO: true if this machine should have personal setup */}}
+
+{{- $dotfiles_private := false -}}{{/* TODO: true if this machine should have distrobox setup */}}
+
 {{- $distrobox_device := false -}}{{/* TODO: true if this machine should have distrobox setup */}}
 {{- $container_device := false -}}{{/* TODO: true if this machine should have minimal container setup */}}
+
 {{- $qube_device := false -}}{{/* TODO: true if this machine should have QubeOS setup */}}
 {{- $qubedom0_device := false -}}{{/* TODO: true if this machine should have QubeOS dom0 setup */}}
-{{- $shell_device := false -}}{{/* TODO: true if this machine should have minimal shell setup */}}
-{{- $hyprland := false -}}{{/* TODO: true if this machine should have arch hyprland setup */}}
+
 {{- $headless := false -}}{{/* TODO: true if this machine should have arch hyprland setup */}}
 {{- "" -}}
 
-
+{{- $osID := .chezmoi.os -}}
+{{- if hasKey .chezmoi.osRelease "id" -}}
+{{-   $osID = printf "%s-%s" .chezmoi.os .chezmoi.osRelease.id -}}
+{{- end -}}
 
 {{- $name := .chezmoi.username -}}
 {{- $email := "fixme" -}}
 {{- $github_user := "johnr14" -}}
 {{- $github_email := "@github.com" -}}
-{{- $computer_name := default "Thrd" (env "CM_computer_name") -}}
-{{- $hostname := default "Fedora" (env "CM_hostname") -}}
-{{- $flavor := default "Any from : KDE,hyprland,QUBE,term" (env "CM_hostname") -}}
+
 {{- $passphrase := default "change me with 'SETPASS=1 chezmoi init'" (index . "passphrase") -}}
 {{- $use_ansible := default "false"}}
-{{- $hyprland := default "false"}}
+
+
 {{- $headless := default "false"}}
+
 
 
 {{- if (env "SETPASS") }}
 {{    $passphrase = promptString "Encryption Passphrase" $passphrase -}}
 {{- end }}
 
+
+
 {{- if (env "ASK") }}
-{{-   $personal_device = promptBool "personal_device" -}}
-{{-   $computer_name = promptString "Computer Name" $computer_name -}}
-{{-   $hostname = promptString "Hostname" $hostname -}}
-{{-   $name = promptString "Full Name" $name -}}
-{{-   $email = promptString "Email" $email -}}
-{{-   $flavor = promptString "Flavor" $flavor -}}
+{{-   $dotfiles_private = promptBool "$dotfiles_private" -}}
+
+{{-   $name      := promptStringOnce . "user.git.name" "Name used in GitHub" -}}
+{{-   $email     := promptStringOnce . "user.git.email" "Email used in GitHub" -}}
+
 {{-   $github_user = promptString "GitHub Username" $github_user -}}
 {{-   $github_email = promptString "GitHub Email" $github_email -}}
-{{-   $use_ansible := promptBool "Use ansible ? (y/n)" -}}
-{{-   $hyprland := promptBool "Install and configure hyprland for arch ? (y/n)" -}}
-{{-   $headless := promptBool "Install headless ? (y/n)" -}}
+
 {{- end }}
 
-{{- $delta_is_not_installed := true }}
-{{- if (contains "delta" (output "bash" "-c" "command -v delta || true")) }}
-{{-   $delta_is_not_installed = false }}
-{{- end }}
+
+umask = 0o022
+
+encryption = "age"
+[age]
+    identity = "~.age/chezmoi_age.key.age"
+    recipient = "age1fmur258g3ryqjey6dem6nv9zpqhguexga6lmkvgd4ekzw2q64spq408zre"
 
 [data]
-  name = {{ $name | quote }}
-  email = {{ $email | quote }}
-  github_user = {{ $github_user | quote }}
-  github_email = {{ $github_email | quote }}
-  computer_name = {{ $computer_name | quote }}
-  hostname = {{ $hostname | quote }}
-  passphrase = {{ $passphrase | quote }}
-  personal_device = {{ $personal_device | quote }}
-  use_ansible = {{ $use_ansible | quote }}
-  hyprland = {{ $hyprland | quote }}
-  headless = {{ $headless | quote }}
+    github_user = {{ $name | quote }}
+    github_email = {{ $email | quote }}
+    passphrase = {{ $passphrase | quote }}
+    dotfiles_private = {{ $dotfiles_private | quote }}
+    use_ansible = {{ $use_ansible | quote }}
+    headless = {{ $headless | quote }}
 
-  [flags]
-    delta_is_not_installed = {{ $delta_is_not_installed }}
 
-encryption = "gpg"
 
+{{- if lookPath "delta" }}
 [diff]
-  exclude = ["scripts"]
+    command = "delta"
+    pager = "delta"
+{{- else if lookPath "nvim" }}
+[diff]
+    command = "nvim"
+    args = ["-d", "{{`{{ .Destination }}`}}", "{{`{{ .Target }}`}}"]
+{{- end }}
+
 
 [merge]
     command = "nvim"
