@@ -45,7 +45,8 @@ function fish_greeting -d "This will show the greeting screen"
     #IP
     #  echo ""
 
-    set PUBLICIP $(curl -s ifconfig.co 2> /dev/null)
+    #set PUBLICIP $(curl -s ifconfig.co 2> /dev/null)
+    set PUBLICIP $(curl -s ifconfig.co/json 2> /dev/null | jq '.ip' | sed 's/\"//g') 
     set VALIDIP $(echo $PUBLICIP | grep -E "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")
 
     if test $VALIDIP
