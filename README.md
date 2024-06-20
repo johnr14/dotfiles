@@ -35,6 +35,8 @@ chezmoi apply
 8. manage ssh and gpg keys
 9. pass
 
+# TOFIX
+1. fish history per distrobox container !
 
 # TOCHECK
 
