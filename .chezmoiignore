@@ -4,7 +4,9 @@ README.md
 */*/*.md
 LICENSE
 
-post-checkout
+.git.config
+.git.hooks.post-checkout
+.git.hooks.post-switch
 
 backups/   # ignore the backups folder, but not its contents
 backups/** # ignore the contents of backups folder but not the folder itself
