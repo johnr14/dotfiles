@@ -1,6 +1,6 @@
 #https://github.com/mollifier/fish-cd-gitroot/blob/master/functions/cd-gitroot.fish-cd-gitroot
 
-function gr -d "cd to git root"
+function gcd -d "cd to git root"
     argparse -n cd-gitroot h/help -- $argv
     or return 1
 
