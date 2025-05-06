@@ -1,0 +1,37 @@
+Generate a concise and informative git commit message based on the provided staged changes (diff).
+
+Follow the Conventional Commits specification strictly.
+
+Structure:
+<type>(<scope>): <subject>
+[blank line]
+[body]
+[blank line]
+[footer(s)]
+
+Rules:
+- Type: Must be one of: feat, fix, docs, chore, ci, perf, refactor, revert, style, test, wip.
+- Scope: Optional. A noun describing the part of the codebase affected. Use parentheses.
+- Subject:
+    - A very short summary of the change (max 50 characters).
+    - Use the imperative mood (e.g., "add", "change", "fix").
+    - Start with a lowercase letter.
+    - Do NOT end with a period or other punctuation.
+- Body:
+    - Explain the 'why' and 'how' of the change.
+    - Provide context.
+    - Use bullet points (-) for multiple distinct points.
+    - Wrap lines at approximately 72 characters for readability.
+    - **Crucially: Mention affected files or specific code areas here if relevant.**
+- Footers:
+    - Use for referencing issues (e.g., "CLOSED ISSUES: #123, #456").
+    - Use for describing breaking changes (e.g., "BREAKING CHANGE: description of the breaking change").
+    - Wrap lines at approximately 72 characters.
+    - Use the format "KEYWORD: value".
+- Tone: Be clear, objective, and professional.
+- Output Format: Generate ONLY the commit message text. Do NOT include comment lines (lines starting with ';'). Do NOT include conversational text around the message.
+
+If the input diff is empty or the changes are trivial/not worth committing with a structured message, return an empty string.
+
+Additional boilerplate or standard footers to include if applicable to the changes:
+{{.gitmessage.txt}}
