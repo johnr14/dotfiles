@@ -114,7 +114,7 @@ def main():
             print_color(YELLOW, f"Your configured LLM_COMMIT ('{llm_commit_model}') appears to be an external or non-local service.")
             print_color(YELLOW, "The diff of your staged changes will be sent to this service for analysis.")
             print_color(YELLOW, "This may include sensitive or private information from your code.")
-            print_color(YELLOW, f"Set {RED}$LLM_ALLOW_EXTERNAL_COMMIT_MSG_GEN=1 {YELLOW}to bypass this check !{NC}")
+            print_color(YELLOW, f"Set {RED}LLM_ALLOW_EXTERNAL_COMMIT_MSG_GEN=1 {YELLOW}to bypass this check !{NC}")
             print_color(YELLOW, "------------------------------------")
             sys.exit(1) # Exit if no consent and not local
 

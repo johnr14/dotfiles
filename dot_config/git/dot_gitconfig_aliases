@@ -23,6 +23,9 @@
     # Commits all changes.
     ca = !git add -A && git commit -av
 
+    # Commit using llm hooks to generate msg and don't open editor
+    cl = !GIT_EDITOR=/bin/true git commit
+
     # Lists the files with the most churn.
     churn = !git --no-pager log --name-only --oneline | grep -v ' ' | sort | uniq -c | sort -nr | head
 
