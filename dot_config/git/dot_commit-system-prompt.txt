@@ -29,7 +29,7 @@ Rules:
     - Wrap lines at approximately 72 characters.
     - Use the format "KEYWORD: value".
 - Tone: Be clear, objective, and professional.
-- Output Format: Generate ONLY the commit message text. Do NOT include comment lines (lines starting with ';'). Do NOT include conversational text around the message.
+- Output Format: Generate ONLY the commit message text. Do NOT include comment lines (lines starting with ';') and do not comment your commit message. Do NOT include conversational text around the message.
 
 If the input diff is empty or the changes are trivial/not worth committing with a structured message, return an empty string.
 
