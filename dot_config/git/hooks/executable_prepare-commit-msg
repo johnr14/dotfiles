@@ -75,6 +75,19 @@ if [ ! -z "$SKIP_LLM_GITHOOK" ]; then
   exit 0
 fi
 
+echo "--- Debugging Escaping ---"
+echo "gitmessage_content (raw from file):"
+cat "$gitmessage_include_file"
+echo "---"
+echo "gitmessage_content (variable value):"
+echo "$gitmessage_content"
+echo "---"
+echo "escaped_gitmessage_content (variable value):"
+echo "$escaped_gitmessage_content"
+echo "---"
+echo "sed command expression string being built:"
+echo "s|{{.gitmessage.txt}}|\$escaped_gitmessage_content|g"
+echo "--- End Debugging ---"
 
 
 # Function to display a spinning animation during the LLM processing
