@@ -1,0 +1,372 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import os
+import sys
+import signal
+import time
+import shutil # Import shutil for file copying
+
+# Global variable to track if dry run was interrupted
+dry_run_interrupted = False
+
+def signal_handler(sig, frame):
+    """Handler for SIGINT (Ctrl+C) during the dry run."""
+    global dry_run_interrupted
+    print("\nDry run interrupted (Ctrl+C detected).")
+    dry_run_interrupted = True
+    # Allow the main process to continue and check the flag
+
+
+def check_rsync_available():
+    """Checks if the rsync command is available in the system's PATH."""
+    try:
+        subprocess.run(['rsync', '--version'], capture_output=True, check=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+def format_path(path):
+    """Ensures a directory path ends with a slash."""
+    # Only add slash if it's a directory and doesn't have one
+    if os.path.isdir(path) and not path.endswith(os.sep):
+        return path + os.sep
+    return path
+
+def run_rsync(source, destination, options, dry_run=False):
+    """Helper function to run rsync with specified options."""
+    command = ['rsync'] + options + [source, destination]
+    if dry_run:
+        command.insert(1, '--dry-run') # Insert --dry-run after 'rsync'
+
+    print(f"Executing: {' '.join(command)}")
+
+    # Use subprocess.Popen to capture output in real-time and handle potential interruption
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    # Read stdout and stderr line by line to display in real-time
+    # This also allows the signal handler to potentially interrupt
+    try:
+        while True:
+            stdout_line = process.stdout.readline()
+            stderr_line = process.stderr.readline()
+
+            if stdout_line:
+                print(stdout_line, end='')
+            if stderr_line:
+                sys.stderr.write(stderr_line)
+
+            # Break if both streams are closed and process has finished
+            if not stdout_line and not stderr_line and process.poll() is not None:
+                break
+
+            # Small sleep to prevent tight loop
+            time.sleep(0.01)
+
+        # Wait for the process to fully finish and get return code
+        process.wait()
+        return process.returncode
+
+    except KeyboardInterrupt:
+        # This KeyboardInterrupt is caught if Ctrl+C happens *during* the Popen loop
+        # The signal_handler is already set up to catch it globally before Popen
+        # However, this ensures we clean up the subprocess if somehow the signal
+        # wasn't caught globally first (less likely with the global handler).
+        print("\nSubprocess interrupted.")
+        process.terminate() # Send SIGTERM
+        try:
+            process.wait(timeout=5) # Wait a bit for it to terminate
+        except subprocess.TimeoutExpired:
+            process.kill() # Send SIGKILL if it didn't terminate
+        return 130 # Return status indicating interruption
+
+
+def do_folder_by_folder_rsync(source_dir, dest_dir):
+    """Performs rsync on each top-level item in the source directory."""
+    print("--- Starting Folder-by-Folder Rsync Sync ---") # Updated message
+    error_count = 0
+
+    try:
+        # List top-level items (including hidden)
+        items = os.listdir(source_dir)
+    except FileNotFoundError:
+        print(f"Error: Source directory '{source_dir}' not found.")
+        return 1
+    except Exception as e:
+        print(f"Error listing source directory '{source_dir}': {e}")
+        return 1
+
+
+    if not items:
+        print(f"Source directory '{source_dir}' is empty. Nothing to sync.")
+        return 0
+
+    print(f"Total top-level items to sync: {len(items)}")
+
+    # Use the main sync options for each item
+    # -a: archive mode (includes -rlptgoD)
+    # --no-D: explicitly do NOT transfer device/special files (overrides -a's D)
+    # --inplace: overwrite destination files in place
+    # --stats: print transfer statistics for the item
+    # --progress: show progress for the item
+    # -v: verbose
+    # -h: human-readable numbers (good with --stats)
+    sync_options = ['-a', '--no-D', '--inplace', '--stats', '--progress', '-v', '-h']
+
+    for i, item in enumerate(items):
+        current_source_item = os.path.join(source_dir, item)
+        print(f"\n--> Syncing item {i + 1} of {len(items)}: '{current_source_item}'...")
+
+        # Ensure source item path is formatted correctly (especially if it's a directory)
+        # This is important when syncing individual items
+        # Note: rsync treats source/ as syncing contents, source as syncing the item itself.
+        # When syncing individual items, we want to sync the item *itself*, so don't add trailing slash here.
+        # rsync -a current_source_item dest_dir will put current_source_item inside dest_dir.
+        # The format_path is only needed for the main source/destination directories.
+        # Let's remove the format_path call here.
+        # formatted_current_source_item = format_path(current_source_item)
+
+        # Pass the raw item path to rsync
+        status = run_rsync(current_source_item, dest_dir, sync_options)
+
+        if status != 0:
+            print(f"Warning: Sync failed for '{current_source_item}' (Exit Status {status}).")
+            error_count += 1
+            # Optionally uncomment to stop on the first error:
+            # break
+
+    print(f"\n--- Folder-by-folder rsync process finished. Total items: {len(items)}, Failed items: {error_count} ---") # Updated message
+    return 1 if error_count > 0 else 0
+
+def python_file_copy(source_dir, dest_dir):
+    """
+    Performs file copy using Python's shutil and os, checking size and timestamp.
+    Walks through the source directory recursively.
+    """
+    print("--- Starting Python File Copy ---")
+    copied_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    try:
+        # Walk through the source directory
+        for root, dirs, files in os.walk(source_dir):
+            # Construct the corresponding destination directory path
+            relative_path = os.path.relpath(root, source_dir)
+            current_dest_dir = os.path.join(dest_dir, relative_path)
+
+            # Create the destination directory if it doesn't exist
+            if not os.path.exists(current_dest_dir):
+                print(f"Creating directory: {current_dest_dir}")
+                os.makedirs(current_dest_dir)
+
+            # Copy files in the current directory
+            for file in files:
+                source_file_path = os.path.join(root, file)
+                dest_file_path = os.path.join(current_dest_dir, file)
+
+                try:
+                    # Check if destination file exists
+                    if os.path.exists(dest_file_path):
+                        # Get stats for comparison (size and modification time)
+                        source_stat = os.stat(source_file_path)
+                        dest_stat = os.stat(dest_file_path)
+
+                        # Compare size and modification time (mtime)
+                        # Using a small tolerance for mtime comparison due to filesystem differences
+                        mtime_tolerance = 1 # seconds
+                        if source_stat.st_size == dest_stat.st_size and \
+                           abs(source_stat.st_mtime - dest_stat.st_mtime) <= mtime_tolerance:
+                            print(f"Skipping (match): {source_file_path}")
+                            skipped_count += 1
+                            continue # Skip to the next file
+
+                    # If destination doesn't exist or doesn't match, copy the file
+                    print(f"Copying: {source_file_path} -> {dest_file_path}")
+                    # shutil.copy2 attempts to preserve metadata including timestamps
+                    shutil.copy2(source_file_path, dest_file_path)
+                    copied_count += 1
+
+                except FileNotFoundError:
+                     print(f"Error: Source file not found during walk: {source_file_path}", file=sys.stderr)
+                     error_count += 1
+                except PermissionError:
+                     print(f"Error: Permission denied for file: {source_file_path}", file=sys.stderr)
+                     error_count += 1
+                except Exception as e:
+                    print(f"Error copying file {source_file_path}: {e}", file=sys.stderr)
+                    error_count += 1
+
+    except FileNotFoundError:
+        print(f"Error: Source directory '{source_dir}' not found for walking.", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error during directory walk in '{source_dir}': {e}", file=sys.stderr)
+        return 1
+
+
+    print(f"\n--- Python File Copy finished. Copied: {copied_count}, Skipped: {skipped_count}, Failed: {error_count} ---")
+    return 1 if error_count > 0 else 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="rsync shortcut with progress and summary. Supports -y, -q, and dry run interruption fallback. Also supports -c for Python file copy."
+    )
+    parser.add_argument(
+        'source',
+        help='Source path for sync/copy.'
+    )
+    parser.add_argument(
+        'destination',
+        help='Destination path for sync/copy.'
+    )
+    parser.add_argument(
+        '-y', '--yes',
+        action='store_true',
+        help='Auto-accept transfer without prompt (applies to default rsync mode).'
+    )
+    parser.add_argument(
+        '-q', '--quick',
+        action='store_true',
+        help='Skip dry run and prompt, proceed directly with folder-by-folder rsync sync.'
+    )
+    parser.add_argument(
+        '-c', '--copy',
+        action='store_true',
+        help='Use Python file copy instead of rsync. Walks directories and copies files one by one, checking size and timestamp.'
+    )
+
+
+    args = parser.parse_args()
+
+    source = args.source
+    destination = args.destination
+    auto_confirm = args.yes
+    quick_mode = args.quick
+    python_copy_mode = args.copy
+
+    # Validate mutually exclusive options
+    if python_copy_mode and quick_mode:
+        print("Error: Options -c and -q are mutually exclusive. Please choose one.", file=sys.stderr)
+        sys.exit(1)
+    if python_copy_mode and auto_confirm:
+         # -y doesn't really make sense for the Python copy mode as it doesn't have a prompt
+         # but let's allow it and just ignore it or warn? Let's just let it pass, it's harmless.
+         pass
+
+
+    # Format paths after parsing arguments
+    # Only format source if it's a directory, destination always if it's a directory
+    # This is important for how rsync and os.walk treat the source path
+    # For os.walk, source='/path/to/dir' walks starting from 'dir'
+    # For rsync source='/path/to/dir/' copies contents, source='/path/to/dir' copies dir itself
+    # Let's keep the original formatting logic for consistency with rsync modes
+    source = format_path(source)
+    destination = format_path(destination)
+
+
+    # --- DEBUGGING: Print source and destination after formatting ---
+    print(f"DEBUG: Source is '{source}', Destination is '{destination}'")
+    # --- END DEBUGGING ---
+
+    # --- Main Logic Flow ---
+
+    if python_copy_mode:
+        # Python copy mode (-c) enabled
+        sync_status = python_file_copy(source, destination)
+        sys.exit(sync_status)
+
+    # If not in Python copy mode, proceed with rsync logic
+    if not check_rsync_available():
+        print("Error: 'rsync' command not found. Please install it and try again.", file=sys.stderr)
+        sys.exit(1)
+
+
+    if quick_mode:
+        # Quick mode (-q) enabled: skip dry run and prompt, go straight to folder-by-folder rsync
+        print("Quick mode (-q) enabled. Skipping dry run and prompt.")
+        sync_status = do_folder_by_folder_rsync(source, destination)
+        sys.exit(sync_status)
+
+    else:
+        # Default rsync mode: Perform dry run first
+
+        print("--- Rsync Dry Run (Files to be affected) ---")
+        print("Press Ctrl+C during the dry run to skip estimation and proceed with folder-by-folder rsync sync.")
+
+        # Set up signal handler for Ctrl+C *before* running the dry run
+        original_sigint_handler = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, signal_handler)
+
+        # Run dry run
+        dry_run_options = ['-av', '--stats']
+        dry_run_status = run_rsync(source, destination, dry_run_options, dry_run=True)
+
+        # Restore original signal handler
+        signal.signal(signal.SIGINT, original_sigint_handler)
+
+        # --- Handle Dry Run Outcome ---
+        global dry_run_interrupted
+        if dry_run_interrupted:
+            # Dry run was interrupted by Ctrl+C
+            sync_status = do_folder_by_folder_rsync(source, destination)
+            sys.exit(sync_status)
+
+        elif dry_run_status != 0:
+            # Other dry run errors
+            print(f"Error during dry run (Exit Status {dry_run_status}). Aborting.", file=sys.stderr)
+            sys.exit(dry_run_status)
+
+        # If dry_run_status is 0, it falls through to the prompt/auto-confirm logic
+        # and dry_run_interrupted is False
+    # End if quick_mode / else default mode block
+
+
+    # --- Proceed with Main Rsync Sync (if dry run successful and not in quick mode) ---
+
+    # Only prompt if not auto-confirming
+    proceed_with_sync = False
+    if not auto_confirm:
+        try:
+            confirm = input('Proceed with sync? (y/n) ').lower()
+            proceed_with_sync = (confirm == 'y')
+        except EOFError:
+            # Handle case where input is closed (e.g., piped input)
+            print("\nInput stream closed. Sync cancelled.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Auto-confirm enabled
+        print("Auto-confirm (-y) enabled. Proceeding with sync...")
+        proceed_with_sync = True
+
+
+    if proceed_with_sync:
+        print("--- Starting Main Rsync Sync ---") # Updated message
+        # Refined main rsync command options:
+        # -a: archive mode (includes -rlptgoD)
+        # --no-D: explicitly do NOT transfer device/special files (overrides -a's D)
+        # --inplace: overwrite destination files in place
+        # --stats: print transfer statistics
+        # --progress: show progress for each file
+        # -v: verbose
+        # -h: human-readable numbers (good with --stats)
+        main_sync_options = ['-a', '--no-D', '--inplace', '--stats', '--progress', '-v', '-h']
+        sync_status = run_rsync(source, destination, main_sync_options)
+
+        if sync_status == 0:
+            print("--- Main Rsync Sync Finished Successfully ---") # Updated message
+        else:
+            print(f"--- Main Rsync Sync Finished with Errors (Exit Status {sync_status}) ---", file=sys.stderr) # Updated message
+
+        sys.exit(sync_status)
+
+    else:
+        # This branch is only reached if not quick_mode, not auto_confirm, and user said 'n'
+        print("Sync cancelled.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
