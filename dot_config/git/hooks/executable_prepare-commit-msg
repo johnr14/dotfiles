@@ -2,7 +2,8 @@
 
 # Set default LLM_COMMIT model if not already set
 # Use 'openrouter/qwen/qwen3-30b-a3b:free' as requested
-LLM_COMMIT="${LLM_COMMIT:-openrouter/qwen/qwen3-30b-a3b:free}"
+#LLM_COMMIT="${LLM_COMMIT:-openrouter/qwen/qwen3-30b-a3b:free}"
+LLM_COMMIT="${LLM_COMMIT:-openrouter/mistralai/mistral-7b-instruct:free}"
 
 
 # Exit if the `SKIP_LLM_GITHOOK` environment variable is set
@@ -106,8 +107,8 @@ fi
 
 # Define the paths for the system prompt template and the gitmessage include file
 # $XDG_CONFIG_HOME is typically ~/.config
-prompt_template_file="./.config/git/.commit-system-prompt.tx"
-gitmessage_include_file="./.config/git/.gitmessage.txt"
+prompt_template_file="$XDG_CONFIG_HOME/git/.commit-system-prompt.txt"
+gitmessage_include_file="$XDG_CONFIG_HOME/git/.gitmessage.txt"
 
 # Check if the prompt template file exists
 if [ ! -f "$prompt_template_file" ]; then
