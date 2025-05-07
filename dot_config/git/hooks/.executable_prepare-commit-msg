@@ -1,0 +1,292 @@
+#!/bin/sh
+
+# Set default LLM_COMMIT model if not already set
+# Use 'openrouter/qwen/qwen3-30b-a3b:free' as requested
+#LLM_COMMIT="${LLM_COMMIT:-openrouter/qwen/qwen3-30b-a3b:free}"
+LLM_COMMIT="${LLM_COMMIT:-openrouter/mistralai/mistral-7b-instruct:free}"
+
+
+# Exit if the `SKIP_LLM_GITHOOK` environment variable is set
+if [ ! -z "$SKIP_LLM_GITHOOK" ]; then
+  exit 0
+fi
+
+# ANSI color codes for styling the output
+RED='\033[0;31m'    # Sets text to red
+GREEN='\033[0;32m'  # Sets text to green
+YELLOW='\033[0;33m' # Sets text to yellow
+BLUE='\033[0;34m'   # Sets text to blue
+MAGENTA='\033[0;35m' # Sets text to magenta
+NC='\033[0m'        # Resets the text color to default, no color
+
+
+echo -e "Generating commit with llm !"
+
+
+# --- External LLM Service Warning ---
+# Check if the LLM_COMMIT model string contains indicators of a local service
+is_local_llm=false
+case "$LLM_COMMIT" in
+    *localhost*|*127.*|*10.*|*192.168.*|*172.1[6-9].*|*172.2[0-9].*|*172.3[0-1].*|*unix://*)
+        # Covers common local addresses and unix sockets
+        is_local_llm=true
+        ;;
+esac
+
+
+# If it doesn't appear to be local, show a warning and ask for confirmation
+if [ "$is_local_llm" = false ]; then
+    # Check for environment variable consent first
+    # Use '[[ ... ]]' for more robust string checking
+    consent_via_env=false
+    # Convert env var to lowercase for checking
+    llm_allow_external_lower=$(echo "${LLM_ALLOW_EXTERNAL_COMMIT_MSG_GEN:-}" | tr '[:upper:]' '[:lower:]')
+    if [[ "$llm_allow_external_lower" == "y" || "$llm_allow_external_lower" == "yes" || \
+          "$llm_allow_external_lower" == "true" || "$llm_allow_external_lower" == "1" ]]; then
+        consent_via_env=true
+        echo -e "${YELLOW}Consent provided via LLM_ALLOW_EXTERNAL environment variable. Proceeding.${NC}"
+    fi
+
+    # TODO: Check git remote if is private or public, check if branch contains `prv` `private` `secure`... and don't proceed unless other flag
+
+    # If consent was not given via environment variable, show the warning and prompt
+    if [ "$consent_via_env" = false ]; then
+        tput cnorm # Ensure cursor is visible for prompt
+
+        # Add a short read with a timeout to clear potential leftover input buffer
+        # This might still help in some semi-interactive cases
+        read -t 0.01 -n 1 -r discard <&0 || true
+
+        echo -e "${YELLOW}--- External LLM Service Warning ---${NC}"
+        echo -e "${YELLOW}Your configured LLM_COMMIT ('$LLM_COMMIT') appears to be an external or non-local service.${NC}"
+        echo -e "${YELLOW}The diff of your staged changes will be sent to this service for analysis.${NC}"
+        echo -e "${YELLOW}This may include sensitive or private information from your code.${NC}"
+        echo -e "${YELLOW}Set ${RED}\$LLM_ALLOW_EXTERNAL_COMMIT_MSG_GEN=1 ${YELLOW} to True to bypass this check !${NC}"
+        echo -e "${YELLOW}------------------------------------${NC}"
+
+        exit 1
+    fi
+
+fi
+# --- End External LLM Service Warning ---
+
+# Exit if the `SKIP_LLM_GITHOOK` environment variable is set
+if [ ! -z "$SKIP_LLM_GITHOOK" ]; then
+  exit 0
+fi
+
+echo "--- Debugging Escaping ---"
+echo "gitmessage_content (raw from file):"
+cat "$gitmessage_include_file"
+echo "---"
+echo "gitmessage_content (variable value):"
+echo "$gitmessage_content"
+echo "---"
+echo "escaped_gitmessage_content (variable value):"
+echo "$escaped_gitmessage_content"
+echo "---"
+echo "sed command expression string being built:"
+echo "s|{{.gitmessage.txt}}|\$escaped_gitmessage_content|g"
+echo "--- End Debugging ---"
+
+
+# Function to display a spinning animation during the LLM processing
+spin_animation() {
+  # Array of spinner characters for the animation
+  spinner=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+  # Infinite loop to keep the animation running
+  while true; do
+    for i in "${spinner[@]}"; do
+      tput civis  # Hide the cursor to enhance the animation appearance
+      tput el1    # Clear the line from the cursor to the beginning to display the spinner
+      # Ensure the message length is consistent for tput cub
+      printf "\\r${YELLOW}%s${NC} Generating LLM commit message...    " "$i" # Added spaces for consistent length
+      sleep 0.1   # Delay to control the speed of the animation
+      tput cub 36 # Move the cursor back (spinner + message + spaces)
+    done
+  done
+}
+
+# Check if the commit is a merge commit based on the presence of a second argument
+if [ -n "$2" ]; then
+  exit 0  # Exit script if it's a merge commit, no custom message needed
+fi
+
+# Check if the `llm` command is installed
+if ! command -v llm &> /dev/null; then
+  echo -e "${RED}Error: 'llm' command is not installed. Please install it ('pip install llm') and try again.${NC}"
+  exit 1
+fi
+
+# Define the paths for the system prompt template and the gitmessage include file
+# $XDG_CONFIG_HOME is typically ~/.config
+USERHOME=$(getent passwd $(whoami) | cut -d: -f6)
+prompt_template_file="${USERHOME}/.config/git/.commit-system-prompt.txt"
+gitmessage_include_file="${USERHOME}/.config/git/.gitmessage.txt"
+
+# Check if the prompt template file exists
+if [ ! -f "$prompt_template_file" ]; then
+    tput cnorm # Show cursor if hidden by potential previous runs
+    echo -e "${RED}Error: LLM commit system prompt template file not found:${NC}"
+    echo -e "${RED}  '$prompt_template_file'${NC}"
+    echo -e "${RED}Please create this file with the system prompt content.${NC}"
+    exit 1
+fi
+
+# Check if the gitmessage include file exists (This one is optional content)
+if [ ! -f "$gitmessage_include_file" ]; then
+    # Use a warning as missing this file means the placeholder will be empty,
+    # but the hook can still proceed.
+    tput cnorm # Show cursor if hidden by potential previous runs
+    echo -e "${YELLOW}Warning: Git message include file not found:${NC}"
+    echo -e "${YELLOW}  '$gitmessage_include_file'${NC}"
+    echo -e "${YELLOW}The '{{.gitmessage.txt}}' placeholder will be replaced with an empty string.${NC}"
+    # Do NOT exit 1 here, as the hook can still run without this file.
+fi
+
+
+# Read the content of the prompt template file
+# Use `cat` which handles potential empty files gracefully (results in empty variable)
+prompt_template_content=$(cat "$prompt_template_file")
+
+# Read the content of the gitmessage include file
+# Use `2>/dev/null || true` to prevent errors if the file doesn't exist or is empty
+gitmessage_content=$(cat "$gitmessage_include_file" 2>/dev/null || true)
+
+# Perform the on-the-fly substitution of '{{.gitmessage.txt}}' with the gitmessage content
+# Escape characters in gitmessage_content that are special to sed's s command (&, /, \, and the delimiter '|')
+escaped_gitmessage_content=$(printf "%s" "$gitmessage_content" | sed -e 's/[\&/\\|]/\\&/g')
+
+# Perform the substitution using '|' as the delimiter for sed
+modified_prompt_content=$(echo -e "$prompt_template_content" | sed -e "s|{{.gitmessage.txt}}|$escaped_gitmessage_content|g")
+
+# Start the spinning animation in the background
+spin_animation &
+spin_pid=$!  # Capture the process ID of the spinning animation
+
+# Generate the commit message using `git diff --cached` piped into the `llm` command
+# Use the specified LLM_COMMIT model and the modified system prompt content
+# Redirect stderr of the llm command to stdout so its output is captured in commit_msg on failure
+if ! commit_msg=$(git diff --cached | llm -m "$LLM_COMMIT" -s "$modified_prompt_content" 2>&1); then
+  # Stop the spinning animation by killing its process
+  kill $spin_pid
+  wait $spin_pid 2>/dev/null  # Wait for the process to terminate and suppress error messages
+  # Finalizing output
+  tput cnorm  # Show the cursor again
+  printf "\\n"  # Move the cursor to the next line
+  printf "${RED}Error: 'llm' command failed to generate the commit message:\\n${commit_msg}${NC}\\n\\nManually set the commit message${NC}\\n" # Ensure color is reset
+  exit 1
+fi
+
+# Stop the spinning animation by killing its process
+kill $spin_pid
+wait $spin_pid 2>/dev/null  # Wait for the process to terminate and suppress error messages
+
+# Finalizing output
+tput cnorm  # Show the cursor again
+echo  # Move the cursor to the next line
+# Display the generated commit message with color-coded headings and body/footers
+echo -e "${BLUE}=== Generated Commit Message ===${NC}"
+
+# Flag to track the first line (header)
+is_first_line=true
+
+# Read commit message line by line and apply colors based on expected structure
+# Using a while loop with read -r handles lines correctly, including whitespace
+echo -e "$commit_msg" | while IFS= read -r line; do
+    if [ "$is_first_line" = true ]; then
+        # Print header line (summary) in Yellow
+        echo -e "${YELLOW}$line${NC}"
+        is_first_line=false
+    else
+        # For subsequent lines, check if it's a specific footer or body/other
+        case "$line" in
+            "")
+                # Print empty lines as is (these usually separate header/body and body/footers)
+                echo -e ""
+                ;;
+            "BREAKING CHANGE:"*)
+                # Print BREAKING CHANGE lines in Magenta
+                echo -e "${MAGENTA}$line${NC}"
+                ;;
+            "CLOSED ISSUES:"*)
+                # Print CLOSED ISSUES lines in Magenta
+                echo -e "${MAGENTA}$line${NC}"
+                ;;
+            *)
+                # Print body and any other footer lines in Green
+                echo -e "${GREEN}$line${NC}"
+                ;;
+        esac
+    fi
+done
+
+echo -e "${BLUE}=================================${NC}"
+echo
+
+# Only used in interactive prompt
+
+# # --- Confirmation Prompt with Edit Option ---
+# # Loop to allow confirmation or editing until accepted or rejected
+# while true; do
+#     # Display the current commit message content before prompting
+#     echo -e "${BLUE}=== Generated Commit Message ===${NC}"
+#     # Reuse the coloring logic for the generated/edited message
+#     is_first_line=true # Reset flag for coloring
+#     echo -e "$commit_msg" | while IFS= read -r line; do
+#         if [ "$is_first_line" = true ]; then echo -e "${YELLOW}$line${NC}"; is_first_line=false; else case "$line" in "") echo -e "";; "BREAKING CHANGE:"*) echo -e "${MAGENTA}$line${NC}";; "CLOSED ISSUES:"*) echo -e "${MAGENTA}$line${NC}";; *) echo -e "${GREEN}$line${NC}";; esac; fi
+#     done
+#     echo -e "${BLUE}=================================${NC}"
+#     echo # Add a newline after the message block
+#
+#     # Use printf to keep the cursor on the same line as the prompt
+#     printf "${YELLOW}Accept this message? (Y/n/o [open in editor]): ${NC}"
+#     read -r confirmation_input
+#
+#     # Convert input to lowercase, default to 'y' if empty
+#     confirmation_input=$(echo -e "${confirmation_input:-y}" | tr '[:upper:]' '[:lower:]')
+#
+#     case "$confirmation_input" in
+#         y|yes)
+#             # User accepted, add a newline after the prompt line and break the loop
+#             echo -e ""
+#             break
+#             ;;
+#         n|no)
+#             # User rejected, print a message and exit.
+#             # Exiting here leaves the commit message file ($1) unchanged,
+#             # allowing the user to manually edit or abort the commit.
+#             echo -e "${YELLOW}Commit message not accepted. Edit manually or abort.${NC}"
+#             exit 0
+#             ;;
+#         o|open)
+#             echo -e "${YELLOW}Opening message in editor...${NC}"
+#             # Write current message to the commit file so editor opens with it
+#             echo -e "$commit_msg" > "$1"
+#
+#             # Find and open the editor
+#             # git var GIT_EDITOR is preferred, fallback to VISUAL, EDITOR, then nano
+#             editor=$(git var GIT_EDITOR 2>/dev/null || echo -e "${VISUAL:-${EDITOR:-nano}}")
+#             # Execute the editor, waiting for it to close
+#             # Use eval to handle complex editor commands with arguments
+#             # Ensure "$1" is quoted to handle spaces in paths
+#             eval "$editor \"$1\""
+#
+#             # Read the modified message back from the file
+#             commit_msg=$(cat "$1")
+#
+#             # The loop will continue to re-prompt Y/n/o with the edited message displayed above
+#             ;;
+#         *)
+#             # Invalid input, re-prompt
+#             echo -e "${RED}Invalid input. Please enter 'y', 'n', or 'o'.${NC}"
+#             ;;
+#     esac
+# done
+# # --- End Confirmation Prompt ---
+
+
+# Write the generated commit message to the specified file (usually the commit message file in .git)
+echo -e "$commit_msg" > "$1"
+
+exit 0 # Explicitly exit successfully

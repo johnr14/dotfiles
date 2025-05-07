@@ -1,8 +1,0 @@
-; This line is a comment and won't be included by the LLM if prompted correctly.
-; Add standard footers below if needed.
-
-; Example standard footer for your project:
-; Signed-off-by: Your Name <your.email@example.com>
-;
-; See https://www.conventionalcommits.org/
-; See https://github.com/angular/angular.js/blob/master/DEVELOPERS.md
