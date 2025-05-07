@@ -134,9 +134,9 @@ def main():
 
     # Check if the gitmessage include file exists (Optional)
     if not os.path.exists(GITMESSAGE_INCLUDE_FILE):
-        print_color(YELLOW, "Warning: Git message include file not found:")
-        print_color(YELLOW, f"  '{GITMESSAGE_INCLUDE_FILE}'")
-        print_color(YELLOW, "The '{{.gitmessage.txt}}' placeholder will be replaced with an empty string.")
+        #print_color(YELLOW, "Warning: Git message include file not found:")
+        #print_color(YELLOW, f"  '{GITMESSAGE_INCLUDE_FILE}'")
+        #print_color(YELLOW, "The '{{.gitmessage.txt}}' placeholder will be replaced with an empty string.")
         gitmessage_content = "" # Default to empty if file doesn't exist
     else:
         # Read the content of the gitmessage include file
