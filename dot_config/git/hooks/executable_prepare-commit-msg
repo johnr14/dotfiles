@@ -10,8 +10,8 @@ import re # For external LLM check
 
 def clean_llm_response(text):
     """Remove code blocks and thinking tags from LLM response."""
-    # Remove <thinking> tags and their contents (case-insensitive)
-    text = re.sub(r'<thinking>.*?</thinking>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    # Remove <thinking> and 【thinking】 tags and their contents (case-insensitive)
+    text = re.sub(r'<thinking>.*?</thinking>|【thinking】.*?【/thinking】', '', text, flags=re.DOTALL | re.IGNORECASE)
     # Remove code blocks (with optional language specifier)
     text = re.sub(r'```(?:\w+)?\n.*?```', '', text, flags=re.DOTALL)
     return text.strip()
