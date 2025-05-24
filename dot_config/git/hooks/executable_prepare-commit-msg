@@ -8,6 +8,14 @@ import time
 import shutil
 import re # For external LLM check
 
+def clean_llm_response(text):
+    """Remove code blocks and thinking tags from LLM response."""
+    # Remove <thinking> tags and their contents (case-insensitive)
+    text = re.sub(r'<thinking>.*?</thinking>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    # Remove code blocks (with optional language specifier)
+    text = re.sub(r'```(?:\w+)?\n.*?```', '', text, flags=re.DOTALL)
+    return text.strip()
+
 # --- Configuration ---
 # Set default LLM_COMMIT model if not already set
 # Use 'openrouter/mistralai/mistral-7b-instruct:free' as requested
@@ -194,6 +202,9 @@ def main():
             # check=True # Don't check here, we want to capture stderr on failure
         )
         commit_msg = llm_process.stdout.strip() # Use strip to remove leading/trailing whitespace/newlines
+
+        # Clean the LLM response by removing code blocks and thinking tags
+        commit_msg = clean_llm_response(commit_msg)
 
         if llm_process.returncode != 0:
             # LLM command failed
