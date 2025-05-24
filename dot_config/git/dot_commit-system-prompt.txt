@@ -33,5 +33,7 @@ Rules:
 
 If the input diff is empty or the changes are trivial/not worth committing with a structured message, return an empty string.
 
+You may not request any changes to files or for any command to be executed. YOU CAN CONLY GENERATE THE COMMIT MESSAGE AND IT SHOULD BE YOUR ONLY ANSWER.
+
 Additional boilerplate or standard footers to include if applicable to the changes:
 {{.gitmessage.txt}}
