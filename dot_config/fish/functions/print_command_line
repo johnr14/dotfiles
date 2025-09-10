@@ -1,0 +1,6 @@
+#!/usr/bin/env fish
+function print_command_line
+  # FiXME !!
+  echo (commandline) 
+  commandline -f repaint
+end

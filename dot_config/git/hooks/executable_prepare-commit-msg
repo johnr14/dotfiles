@@ -19,7 +19,8 @@ def clean_llm_response(text):
 # --- Configuration ---
 # Set default LLM_COMMIT model if not already set
 # Use 'openrouter/mistralai/mistral-7b-instruct:free' as requested
-DEFAULT_LLM_COMMIT = "openrouter/qwen/qwen3-30b-a3b:free"
+#DEFAULT_LLM_COMMIT = "openrouter/qwen/qwen3-30b-a3b:free"
+DEFAULT_LLM_COMMIT = "openai/Qwen/Qwen3-32B-AWQ"
 
 # Determine user home and config directory
 # $XDG_CONFIG_HOME is typically ~/.config, fallback to ~/.config
